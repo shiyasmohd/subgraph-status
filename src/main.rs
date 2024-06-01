@@ -202,6 +202,12 @@ fn display_status(subgraph_data: SubgraphData) {
         }),
     ]));
 
+    let earliest_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
+        .earliestBlock
+        .number
+        .parse()
+        .expect("Not a valid number");
+
     let latest_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
         .latestBlock
         .number
@@ -215,6 +221,11 @@ fn display_status(subgraph_data: SubgraphData) {
         .expect("Not a valid number");
 
     let blocks_behind = chain_head_block - latest_block;
+
+    table.add_row(Row::new(vec![
+        Cell::new("Synced"),
+        Cell::new(&get_sync_percentage(earliest_block, latest_block, chain_head_block).unwrap()),
+    ]));
 
     table.add_row(Row::new(vec![
         Cell::new("Blocks Behind"),
@@ -370,4 +381,15 @@ fn display_status(subgraph_data: SubgraphData) {
                 .bright_yellow()
         );
     }
+}
+
+fn get_sync_percentage(
+    start_block: i64,
+    latest_block: i64,
+    chain_head_block: i64,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let blocks_processed = latest_block - start_block;
+    let total_blocks = chain_head_block - start_block;
+    let synced = (blocks_processed * 100) / total_blocks;
+    return (Ok(synced.to_string() + "%"));
 }
