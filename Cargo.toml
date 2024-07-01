@@ -1,5 +1,5 @@
 [package]
-name = "subraph-status-rust"
+name = "subgraph"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,3 +10,8 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 colored = "2.0.0"
 prettytable-rs = "0.10.0"
+
+[[bin]]
+edition = "2018"
+name = "subgraph"
+path = "src/main.rs"
