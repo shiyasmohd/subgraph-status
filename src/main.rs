@@ -1,5 +1,6 @@
 #![allow(warnings)]
 use colored::Colorize;
+use core::fmt;
 use prettytable::color::*;
 use prettytable::format::Alignment;
 use prettytable::{Attr, Cell, Row, Table};
@@ -7,6 +8,13 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::env;
 use std::io;
+
+#[derive(Deserialize, Debug)]
+enum Health {
+    healthy,
+    unhealthy,
+    failed,
+}
 
 #[derive(Deserialize, Debug)]
 struct Response {
@@ -21,7 +29,7 @@ struct SubgraphData {
 
 #[derive(Deserialize, Debug)]
 struct SubgraphFeatures {
-    apiVersion: String,
+    apiVersion: Option<String>,
     dataSources: Vec<String>,
     features: Vec<String>,
     specVersion: String,
@@ -32,7 +40,7 @@ struct SubgraphFeatures {
 #[derive(Deserialize, Debug)]
 struct IndexingStatus {
     subgraph: String,
-    health: String,
+    health: Health,
     entityCount: String,
     node: String,
     paused: bool,
@@ -67,18 +75,29 @@ struct GraphqlQuery<'a> {
     query: &'a str,
 }
 
+impl fmt::Display for Health {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
+    }
+}
+
 fn main() {
     // let deployment_id = "QmRQUYU2HNXDQdWCbcif8iLCxnoNcz8jdtJiVJJXAyKgjk";
     let args: Vec<String> = env::args().collect();
-
     if args.len() > 1 {
         // The first argument (args[0]) is the program name, so we take the second one
         let deployment_id = &args[1];
-        match get_subgraph_status(deployment_id.to_string()) {
-            Ok(res) => display_status(res),
-            Err(err) => {
-                println!("Failed to fetch status: {}", err);
+        if (deployment_id.starts_with("Qm") && deployment_id.len() == 46) {
+            match get_subgraph_status(deployment_id) {
+                Ok(res) => display_status(&res),
+                Err(err) => {
+                    println!("Failed to fetch status: {}", err);
+                }
             }
+        } else {
+            println!("{}", "Please enter correct Deployment ID".red());
         }
     } else {
         println!("{}", "Please provide Deployment ID of subgraph".red());
@@ -86,7 +105,7 @@ fn main() {
 }
 
 #[tokio::main]
-async fn get_subgraph_status(deployment_id: String) -> Result<SubgraphData, reqwest::Error> {
+async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, reqwest::Error> {
     const URL: &str = "https://api.thegraph.com/index-node/graphql";
     let client = reqwest::Client::new();
 
@@ -160,13 +179,19 @@ async fn get_subgraph_status(deployment_id: String) -> Result<SubgraphData, reqw
     Ok(response_json.data)
 }
 
-fn display_status(subgraph_data: SubgraphData) {
+fn display_status(subgraph_data: &SubgraphData) {
+    if subgraph_data.indexingStatuses.len() == 0 {
+        println!("{}", "No Matches for Deployment ID found".bright_red());
+        return;
+    }
+
     let mut table = Table::new();
 
     table.add_row(Row::new(vec![Cell::new_align(
         "Subgraph Status",
         Alignment::CENTER,
     )
+    .with_style(Attr::ForegroundColor(BRIGHT_YELLOW))
     .with_hspan(2)]));
 
     table.add_row(Row::new(vec![
@@ -183,9 +208,24 @@ fn display_status(subgraph_data: SubgraphData) {
         }),
     ]));
 
+    let mut health_status_txt_clr: u32;
+
+    match subgraph_data.indexingStatuses[0].health {
+        Health::healthy => {
+            health_status_txt_clr = GREEN;
+        }
+        Health::unhealthy => {
+            health_status_txt_clr = YELLOW;
+        }
+        Health::failed => {
+            health_status_txt_clr = RED;
+        }
+    }
+
     table.add_row(Row::new(vec![
         Cell::new("Health"),
-        Cell::new(&subgraph_data.indexingStatuses[0].health),
+        Cell::new(&subgraph_data.indexingStatuses[0].health.to_string())
+            .with_style(Attr::ForegroundColor(health_status_txt_clr)),
     ]));
 
     table.add_row(Row::new(vec![
@@ -224,12 +264,30 @@ fn display_status(subgraph_data: SubgraphData) {
 
     table.add_row(Row::new(vec![
         Cell::new("Synced"),
-        Cell::new(&get_sync_percentage(earliest_block, latest_block, chain_head_block).unwrap()),
+        Cell::new(
+            &(get_sync_percentage(earliest_block, latest_block, chain_head_block).to_string()
+                + "%"),
+        ),
     ]));
+
+    let blocks_behind_txt_clr: u32;
+
+    match blocks_behind {
+        blocks_behind if blocks_behind < 30 => {
+            blocks_behind_txt_clr = GREEN;
+        }
+        blocks_behind if blocks_behind < 1000 => {
+            blocks_behind_txt_clr = YELLOW;
+        }
+        _ => {
+            blocks_behind_txt_clr = RED;
+        }
+    }
 
     table.add_row(Row::new(vec![
         Cell::new("Blocks Behind"),
-        Cell::new(&blocks_behind.to_string()),
+        Cell::new(&blocks_behind.to_string())
+            .with_style(Attr::ForegroundColor(blocks_behind_txt_clr)),
     ]));
 
     table.add_row(Row::new(vec![
@@ -243,17 +301,17 @@ fn display_status(subgraph_data: SubgraphData) {
     ]));
 
     table.add_row(Row::new(vec![
-        Cell::new("History Blocks"),
-        Cell::new(&subgraph_data.indexingStatuses[0].historyBlocks.to_string()),
-    ]));
-
-    table.add_row(Row::new(vec![
         Cell::new("Earliest Block"),
         Cell::new(
             &subgraph_data.indexingStatuses[0].chains[0]
                 .earliestBlock
                 .number,
         ),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new("History Blocks"),
+        Cell::new(&subgraph_data.indexingStatuses[0].historyBlocks.to_string()),
     ]));
 
     table.add_row(Row::new(vec![
@@ -270,6 +328,7 @@ fn display_status(subgraph_data: SubgraphData) {
         "Subgraph Features",
         Alignment::CENTER,
     )
+    .with_style(Attr::ForegroundColor(BRIGHT_YELLOW))
     .with_hspan(2)]));
 
     table.add_row(Row::new(vec![
@@ -277,65 +336,57 @@ fn display_status(subgraph_data: SubgraphData) {
         Cell::new(&subgraph_data.subgraphFeatures.specVersion),
     ]));
 
+    // let mut api_version = String::from("N/A");
+    // if &subgraph_data.subgraphFeatures.apiVersion.is_some(){
+
+    // }
     table.add_row(Row::new(vec![
         Cell::new("API Version"),
-        Cell::new(&subgraph_data.subgraphFeatures.apiVersion),
-    ]));
-
-    table.add_row(Row::new(vec![
-        Cell::new("Event Handler"),
         Cell::new(
-            if subgraph_data
+            &subgraph_data
                 .subgraphFeatures
-                .handlers
-                .contains(&"event".to_string())
-            {
-                "✅"
-            } else {
-                "❌"
-            },
+                .apiVersion
+                .clone()
+                .unwrap_or(String::from("N/A")),
         ),
     ]));
 
-    table.add_row(Row::new(vec![
-        Cell::new("Call Handler"),
-        Cell::new(
-            if subgraph_data
-                .subgraphFeatures
-                .handlers
-                .contains(&"call".to_string())
-            {
-                "✅"
-            } else {
-                "❌"
-            },
-        ),
-    ]));
+    let mut handlers_cell = String::new();
+
+    for handler in &subgraph_data.subgraphFeatures.handlers {
+        handlers_cell
+            .push_str(&(capitalize_first_letter(handler).to_string() + " Handler " + "\n"));
+    }
 
     table.add_row(Row::new(vec![
-        Cell::new("Block Handler"),
-        Cell::new(
-            if subgraph_data
-                .subgraphFeatures
-                .handlers
-                .contains(&"block".to_string())
-            {
-                "✅"
-            } else {
-                "❌"
-            },
-        ),
+        Cell::new("Handlers Used"),
+        Cell::new(&handlers_cell),
     ]));
+
+    let mut data_source_cell = String::new();
+    for data_souce in &subgraph_data.subgraphFeatures.dataSources {
+        data_source_cell.push_str(&(data_souce.to_string() + "\n"));
+    }
 
     if !subgraph_data.subgraphFeatures.dataSources.is_empty() {
         table.add_row(Row::new(vec![
             Cell::new("Data Sources"),
-            Cell::new(&subgraph_data.subgraphFeatures.dataSources[0]),
+            Cell::new(&data_source_cell),
         ]));
-        for i in subgraph_data.subgraphFeatures.dataSources.iter().skip(1) {
-            table.add_row(Row::new(vec![Cell::new(""), Cell::new(i)]));
+    }
+
+    let mut features_cell = String::new();
+    if subgraph_data.subgraphFeatures.features.len() == 0 {
+        features_cell = String::from("N/A");
+    } else {
+        for feature in &subgraph_data.subgraphFeatures.features {
+            features_cell.push_str(&(feature.to_string() + "\n"));
         }
     }
+    table.add_row(Row::new(vec![
+        Cell::new("Features Used"),
+        Cell::new(&features_cell),
+    ]));
 
     table.printstd();
 
@@ -383,13 +434,20 @@ fn display_status(subgraph_data: SubgraphData) {
     }
 }
 
-fn get_sync_percentage(
-    start_block: i64,
-    latest_block: i64,
-    chain_head_block: i64,
-) -> Result<String, Box<dyn std::error::Error>> {
+fn get_sync_percentage(start_block: i64, latest_block: i64, chain_head_block: i64) -> i64 {
     let blocks_processed = latest_block - start_block;
     let total_blocks = chain_head_block - start_block;
     let synced = (blocks_processed * 100) / total_blocks;
-    return (Ok(synced.to_string() + "%"));
+    if synced > 100 {
+        return 100;
+    }
+    return synced;
+}
+
+fn capitalize_first_letter(word: &String) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first_char) => first_char.to_uppercase().collect::<String>() + chars.as_str(),
+    }
 }

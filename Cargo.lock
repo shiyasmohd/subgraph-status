@@ -891,7 +891,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "subraph-status-rust"
+name = "subgraph"
 version = "0.1.0"
 dependencies = [
  "colored",
