@@ -323,7 +323,7 @@ fn display_status(subgraph_data: &SubgraphData) {
     ]));
 
     table.add_row(Row::new(vec![
-        Cell::new("Earliest Block"),
+        Cell::new("Start Block"),
         Cell::new(
             &subgraph_data.indexingStatuses[0].chains[0]
                 .earliestBlock
