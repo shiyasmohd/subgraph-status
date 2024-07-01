@@ -4,6 +4,7 @@ use core::fmt;
 use prettytable::color::*;
 use prettytable::format::Alignment;
 use prettytable::{Attr, Cell, Row, Table};
+use regex::Regex;
 use serde::Deserialize;
 use serde::Serialize;
 use std::env;
@@ -47,19 +48,18 @@ struct IndexingStatus {
     synced: bool,
     historyBlocks: i64,
     fatalError: Option<SubgraphError>,
-    nonFatalErrors: Vec<Option<SubgraphError>>,
+    nonFatalErrors: Vec<SubgraphError>,
     chains: Vec<ChainIndexingStatus>,
 }
 #[derive(Deserialize, Debug)]
 struct SubgraphError {
     message: String,
-    block: Block,
+    block: Option<Block>,
     handlers: Option<String>,
     deterministic: bool,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 struct Block {
-    hash: String,
     number: String,
 }
 #[derive(Deserialize, Debug)]
@@ -67,8 +67,7 @@ struct ChainIndexingStatus {
     network: String,
     chainHeadBlock: Block,
     earliestBlock: Block,
-    latestBlock: Block,
-    lastHealthyBlock: Option<Block>,
+    latestBlock: Option<Block>,
 }
 #[derive(Serialize)]
 struct GraphqlQuery<'a> {
@@ -78,8 +77,6 @@ struct GraphqlQuery<'a> {
 impl fmt::Display for Health {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
-        // or, alternatively:
-        // fmt::Debug::fmt(self, f)
     }
 }
 
@@ -102,6 +99,21 @@ fn main() {
     } else {
         println!("{}", "Please provide Deployment ID of subgraph".red());
     }
+}
+
+fn get_lowest_start_block(data: &str) -> String {
+    let re = Regex::new(r"startBlock:\s*(\d+)").unwrap();
+
+    let mut start_blocks: Vec<u64> = re
+        .captures_iter(data)
+        .filter_map(|cap| cap[1].parse::<u64>().ok())
+        .collect();
+
+    start_blocks
+        .iter()
+        .min()
+        .map(|min| min.to_string())
+        .unwrap_or_else(|| String::from("0"))
 }
 
 #[tokio::main]
@@ -131,26 +143,16 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
             fatalError {{
                 message
                 handler
-                block {{
-                    hash
-                    number
-                }}
                 deterministic
             }}
             chains {{
                 chainHeadBlock {{
-                    hash
                     number
                 }}
                 latestBlock {{
-                    hash
                     number
                 }}
                 earliestBlock {{
-                    hash
-                    number
-                }}
-                lastHealthyBlock{{
                     number
                 }}
                 network
@@ -161,7 +163,6 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
                 handler
                 block{{
                     number
-                    hash
                 }}
             }}
         }}
@@ -174,7 +175,18 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
 
     // Send the POST request
     let response = client.post(URL).json(&req_body).send().await?;
-    let response_json: Response = response.json().await?;
+    let mut response_json: Response = response.json().await?;
+
+    let manifest_url = format!(
+        "https://api.thegraph.com/ipfs/api/v0/cat?arg={}",
+        deployment_id
+    );
+    let manifest_response = client.get(manifest_url).send().await?;
+    let manifest = manifest_response.text().await?;
+
+    response_json.data.indexingStatuses[0].chains[0].earliestBlock = Block {
+        number: get_lowest_start_block(&manifest),
+    };
 
     Ok(response_json.data)
 }
@@ -248,11 +260,20 @@ fn display_status(subgraph_data: &SubgraphData) {
         .parse()
         .expect("Not a valid number");
 
-    let latest_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
+    let latest_block: i64 = if subgraph_data.indexingStatuses[0].chains[0]
         .latestBlock
-        .number
-        .parse()
-        .expect("Not a valid number");
+        .is_some()
+    {
+        subgraph_data.indexingStatuses[0].chains[0]
+            .latestBlock
+            .as_ref()
+            .unwrap()
+            .number
+            .parse()
+            .expect("Not a valid number")
+    } else {
+        0
+    };
 
     let chain_head_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
         .chainHeadBlock
@@ -264,10 +285,11 @@ fn display_status(subgraph_data: &SubgraphData) {
 
     table.add_row(Row::new(vec![
         Cell::new("Synced"),
-        Cell::new(
-            &(get_sync_percentage(earliest_block, latest_block, chain_head_block).to_string()
-                + "%"),
-        ),
+        Cell::new(&get_sync_percentage(
+            earliest_block,
+            latest_block,
+            chain_head_block,
+        )),
     ]));
 
     let blocks_behind_txt_clr: u32;
@@ -336,10 +358,6 @@ fn display_status(subgraph_data: &SubgraphData) {
         Cell::new(&subgraph_data.subgraphFeatures.specVersion),
     ]));
 
-    // let mut api_version = String::from("N/A");
-    // if &subgraph_data.subgraphFeatures.apiVersion.is_some(){
-
-    // }
     table.add_row(Row::new(vec![
         Cell::new("API Version"),
         Cell::new(
@@ -390,58 +408,29 @@ fn display_status(subgraph_data: &SubgraphData) {
 
     table.printstd();
 
-    if subgraph_data.indexingStatuses[0].fatalError.is_some() {
+    if let Some(fatalError) = subgraph_data.indexingStatuses[0].fatalError.as_ref() {
         println!("\n{}", "Fatal Errors".bright_yellow());
-        println!(
-            "\nMessage: {}",
-            subgraph_data.indexingStatuses[0]
-                .fatalError
-                .as_ref()
-                .unwrap()
-                .message
-                .red()
-        );
-        println!(
-            "Block: {}",
-            subgraph_data.indexingStatuses[0]
-                .fatalError
-                .as_ref()
-                .unwrap()
-                .block
-                .number
-                .bright_yellow()
-        );
+        println!("\nMessage: {}", fatalError.message.red());
     }
-    if !subgraph_data.indexingStatuses[0].nonFatalErrors.is_empty() {
+
+    if subgraph_data.indexingStatuses[0].nonFatalErrors.len() > 0 {
+        let nonFatalError = &subgraph_data.indexingStatuses[0].nonFatalErrors[0];
         println!("\n{}", "Non Fatal Errors".bright_yellow());
-        println!(
-            "\nMessage: {}",
-            subgraph_data.indexingStatuses[0].nonFatalErrors[0]
-                .as_ref()
-                .unwrap()
-                .message
-                .red()
-        );
-        println!(
-            "Block: {}",
-            subgraph_data.indexingStatuses[0].nonFatalErrors[0]
-                .as_ref()
-                .unwrap()
-                .block
-                .number
-                .bright_yellow()
-        );
+        println!("\nMessage: {}", nonFatalError.message.red());
     }
 }
 
-fn get_sync_percentage(start_block: i64, latest_block: i64, chain_head_block: i64) -> i64 {
+fn get_sync_percentage(start_block: i64, latest_block: i64, chain_head_block: i64) -> String {
+    if latest_block == 0 {
+        String::from("N/A");
+    }
     let blocks_processed = latest_block - start_block;
     let total_blocks = chain_head_block - start_block;
     let synced = (blocks_processed * 100) / total_blocks;
     if synced > 100 {
-        return 100;
+        return String::from("100%");
     }
-    return synced;
+    return synced.to_string() + "%";
 }
 
 fn capitalize_first_letter(word: &String) -> String {
