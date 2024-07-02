@@ -101,21 +101,6 @@ fn main() {
     }
 }
 
-fn get_lowest_start_block(data: &str) -> String {
-    let re = Regex::new(r"startBlock:\s*(\d+)").unwrap();
-
-    let mut start_blocks: Vec<u64> = re
-        .captures_iter(data)
-        .filter_map(|cap| cap[1].parse::<u64>().ok())
-        .collect();
-
-    start_blocks
-        .iter()
-        .min()
-        .map(|min| min.to_string())
-        .unwrap_or_else(|| String::from("0"))
-}
-
 #[tokio::main]
 async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, reqwest::Error> {
     const URL: &str = "https://api.thegraph.com/index-node/graphql";
@@ -177,18 +162,31 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
     let response = client.post(URL).json(&req_body).send().await?;
     let mut response_json: Response = response.json().await?;
 
+    Ok(response_json.data)
+}
+
+#[tokio::main]
+async fn get_start_block(deployment_id: &String) -> Result<String, reqwest::Error> {
     let manifest_url = format!(
         "https://api.thegraph.com/ipfs/api/v0/cat?arg={}",
         deployment_id
     );
+    let client = reqwest::Client::new();
     let manifest_response = client.get(manifest_url).send().await?;
     let manifest = manifest_response.text().await?;
 
-    response_json.data.indexingStatuses[0].chains[0].earliestBlock = Block {
-        number: get_lowest_start_block(&manifest),
-    };
+    let re = Regex::new(r"startBlock:\s*(\d+)").unwrap();
+    let mut start_blocks: Vec<u64> = re
+        .captures_iter(&manifest)
+        .filter_map(|cap| cap[1].parse::<u64>().ok())
+        .collect();
 
-    Ok(response_json.data)
+    let start_block = start_blocks
+        .iter()
+        .min()
+        .map(|min| min.to_string())
+        .unwrap_or_else(|| String::from("0"));
+    Ok(start_block)
 }
 
 fn display_status(subgraph_data: &SubgraphData) {
@@ -196,6 +194,8 @@ fn display_status(subgraph_data: &SubgraphData) {
         println!("{}", "No Matches for Deployment ID found".bright_red());
         return;
     }
+
+    let start_block = get_start_block(&subgraph_data.indexingStatuses[0].subgraph).unwrap();
 
     let mut table = Table::new();
 
@@ -254,11 +254,7 @@ fn display_status(subgraph_data: &SubgraphData) {
         }),
     ]));
 
-    let earliest_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
-        .earliestBlock
-        .number
-        .parse()
-        .expect("Not a valid number");
+    let earliest_block: i64 = start_block.parse().expect("Not a valid number");
 
     let latest_block: i64 = if subgraph_data.indexingStatuses[0].chains[0]
         .latestBlock
