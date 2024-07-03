@@ -195,7 +195,10 @@ fn display_status(subgraph_data: &SubgraphData) {
         return;
     }
 
-    let start_block = get_start_block(&subgraph_data.indexingStatuses[0].subgraph).unwrap();
+    let start_block: i64 = get_start_block(&subgraph_data.indexingStatuses[0].subgraph)
+        .unwrap()
+        .parse()
+        .expect("Not a valid number");
 
     let mut table = Table::new();
 
@@ -254,8 +257,6 @@ fn display_status(subgraph_data: &SubgraphData) {
         }),
     ]));
 
-    let earliest_block: i64 = start_block.parse().expect("Not a valid number");
-
     let latest_block: i64 = if subgraph_data.indexingStatuses[0].chains[0]
         .latestBlock
         .is_some()
@@ -282,7 +283,7 @@ fn display_status(subgraph_data: &SubgraphData) {
     table.add_row(Row::new(vec![
         Cell::new("Synced"),
         Cell::new(&get_sync_percentage(
-            earliest_block,
+            start_block,
             latest_block,
             chain_head_block,
         )),
@@ -320,11 +321,7 @@ fn display_status(subgraph_data: &SubgraphData) {
 
     table.add_row(Row::new(vec![
         Cell::new("Start Block"),
-        Cell::new(
-            &subgraph_data.indexingStatuses[0].chains[0]
-                .earliestBlock
-                .number,
-        ),
+        Cell::new(&start_block.to_string()),
     ]));
 
     table.add_row(Row::new(vec![
