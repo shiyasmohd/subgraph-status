@@ -415,7 +415,7 @@ fn display_status(subgraph_data: &SubgraphData) {
 
 fn get_sync_percentage(start_block: i64, latest_block: i64, chain_head_block: i64) -> String {
     if latest_block == 0 {
-        String::from("N/A");
+        return String::from("N/A");
     }
     let blocks_processed = latest_block - start_block;
     let total_blocks = chain_head_block - start_block;
