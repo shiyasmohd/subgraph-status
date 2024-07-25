@@ -278,6 +278,12 @@ fn display_status(subgraph_data: &SubgraphData) {
         .parse()
         .expect("Not a valid number");
 
+    let earliest_block: i64 = subgraph_data.indexingStatuses[0].chains[0]
+        .earliestBlock
+        .number
+        .parse()
+        .expect("Not a valid number");
+
     let blocks_behind = chain_head_block - latest_block;
 
     table.add_row(Row::new(vec![
@@ -322,6 +328,11 @@ fn display_status(subgraph_data: &SubgraphData) {
     table.add_row(Row::new(vec![
         Cell::new("Start Block"),
         Cell::new(&start_block.to_string()),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new("Earliest Block"),
+        Cell::new(&earliest_block.to_string()),
     ]));
 
     table.add_row(Row::new(vec![
