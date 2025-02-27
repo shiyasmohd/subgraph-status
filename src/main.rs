@@ -43,8 +43,8 @@ struct IndexingStatus {
     subgraph: String,
     health: Health,
     entityCount: String,
-    node: String,
-    paused: bool,
+    node: Option<String>,
+    paused: Option<bool>,
     synced: bool,
     historyBlocks: i64,
     fatalError: Option<SubgraphError>,
@@ -81,10 +81,8 @@ impl fmt::Display for Health {
 }
 
 fn main() {
-    // let deployment_id = "QmRQUYU2HNXDQdWCbcif8iLCxnoNcz8jdtJiVJJXAyKgjk";
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
-        // The first argument (args[0]) is the program name, so we take the second one
         let deployment_id = &args[1];
         if (deployment_id.starts_with("Qm") && deployment_id.len() == 46) {
             match get_subgraph_status(deployment_id) {
@@ -158,7 +156,6 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
 
     let req_body: GraphqlQuery = GraphqlQuery { query: &query };
 
-    // Send the POST request
     let response = client.post(URL).json(&req_body).send().await?;
     let mut response_json: Response = response.json().await?;
 
@@ -250,11 +247,17 @@ fn display_status(subgraph_data: &SubgraphData) {
 
     table.add_row(Row::new(vec![
         Cell::new("Paused"),
-        Cell::new(if subgraph_data.indexingStatuses[0].paused {
-            "✅"
-        } else {
-            "❌"
-        }),
+        Cell::new(
+            if let Some(paused) = subgraph_data.indexingStatuses[0].paused {
+                if paused {
+                    "✅"
+                } else {
+                    "❌"
+                }
+            } else {
+                "N/A"
+            },
+        ),
     ]));
 
     let latest_block: i64 = if subgraph_data.indexingStatuses[0].chains[0]
@@ -347,7 +350,13 @@ fn display_status(subgraph_data: &SubgraphData) {
 
     table.add_row(Row::new(vec![
         Cell::new("Node"),
-        Cell::new(&subgraph_data.indexingStatuses[0].node),
+        Cell::new(
+            if let Some(node) = &subgraph_data.indexingStatuses[0].node {
+                &node
+            } else {
+                "N/A"
+            },
+        ),
     ]));
 
     table.add_row(Row::new(vec![Cell::new_align(
