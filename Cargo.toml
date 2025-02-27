@@ -1,7 +1,17 @@
 [package]
-name = "subgraph"
+name = "subgraph-status"
 version = "0.1.0"
 edition = "2021"
+authors = ["Shiyas <shiyasmohd.official@gmail.com>"]
+description = "A Rust CLI tool to check subgraph status"
+repository = "https://github.com/shiyasmohd/subgraph-status"
+license = "MIT"
+keywords = ["subgraph", "cli", "tool", "rust"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "subgraph-status"
+path = "src/main.rs"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["blocking", "json"] }
@@ -11,8 +21,3 @@ tokio = { version = "1", features = ["full"] }
 colored = "2.0.0"
 prettytable-rs = "0.10.0"
 regex = "*"
-
-[[bin]]
-edition = "2018"
-name = "subgraph"
-path = "src/main.rs"
