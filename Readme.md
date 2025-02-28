@@ -4,8 +4,7 @@
 🖥️  &nbsp;CLI Application to Check Your Subgraph's Status 
 </div>
 
-<div align="center" width="60%">
-    https://github.com/user-attachments/assets/64c89e66-f127-4eab-883b-3dc61822d083
+<video controls autoplay loop src='https://github.com/user-attachments/assets/eaec9da2-3ace-46a3-b076-e96a1aeb9330' width="60%"></video>
 </div>
 
 ## Prequsites 🛠️
