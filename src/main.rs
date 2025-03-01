@@ -99,9 +99,24 @@ fn main() {
     }
 }
 
+fn get_status_url() -> String {
+    let status_url = match env::var("SUBGRAPH_STATUS_URL") {
+        Ok(url) => url,
+        Err(_) => {
+            println!(
+                "{}",
+                "Please set SUBGRAPH_STATUS_URL environment variable to continue".red()
+            );
+            std::process::exit(1);
+        }
+    };
+    return status_url;
+}
+
 #[tokio::main]
 async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, reqwest::Error> {
-    const URL: &str = "https://api.thegraph.com/index-node/graphql";
+    let url = get_status_url();
+
     let client = reqwest::Client::new();
 
     let query = format!(
@@ -156,7 +171,7 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
 
     let req_body: GraphqlQuery = GraphqlQuery { query: &query };
 
-    let response = client.post(URL).json(&req_body).send().await?;
+    let response = client.post(url).json(&req_body).send().await?;
     let mut response_json: Response = response.json().await?;
 
     Ok(response_json.data)
