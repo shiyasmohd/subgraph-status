@@ -100,11 +100,19 @@ fn main() {
         println!("{}", "Please provide Deployment ID of subgraph".red());
     }
 }
-
 fn get_status_url() -> String {
     let status_url =
         env::var("SUBGRAPH_STATUS_URL").unwrap_or_else(|_| UPGRADE_INDEXER_URL.to_string());
-    return status_url;
+
+    match status_url.as_str() {
+        url if url.ends_with("/status") => url.to_string(),
+        url if url.ends_with('/') => format!("{}status", url),
+        url => format!("{}/status", url),
+        _ => {
+            println!("{}", "Invalid SUBGRAPH_STATUS_URL".red());
+            std::process::exit(1);
+        }
+    }
 }
 
 #[tokio::main]
