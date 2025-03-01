@@ -46,7 +46,7 @@ struct IndexingStatus {
     node: Option<String>,
     paused: Option<bool>,
     synced: bool,
-    historyBlocks: i64,
+    historyBlocks: i32,
     fatalError: Option<SubgraphError>,
     nonFatalErrors: Vec<SubgraphError>,
     chains: Vec<ChainIndexingStatus>,
@@ -353,10 +353,13 @@ fn display_status(subgraph_data: &SubgraphData) {
         Cell::new(&earliest_block.to_string()),
     ]));
 
-    table.add_row(Row::new(vec![
-        Cell::new("History Blocks"),
-        Cell::new(&subgraph_data.indexingStatuses[0].historyBlocks.to_string()),
-    ]));
+    let pruning = if subgraph_data.indexingStatuses[0].historyBlocks == i32::MAX {
+        "❌"
+    } else {
+        &subgraph_data.indexingStatuses[0].historyBlocks.to_string()
+    };
+
+    table.add_row(Row::new(vec![Cell::new("Pruning"), Cell::new(pruning)]));
 
     table.add_row(Row::new(vec![
         Cell::new("Network"),
