@@ -41,6 +41,3 @@ Example Command
 ```
 cargo run QmUfcf55AoqVs3zuyfu9TwYh8G4LxRnY5DpxjVCea3RSWe
 ```
-## Result
-<br/>
-<img src="https://ipfs.filebase.io/ipfs/QmYRZzeMUaNZGtMNvvXrGzXMYAA2o1VvYe5vcS8F8Nrkof" width="400">
