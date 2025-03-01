@@ -10,6 +10,8 @@ use serde::Serialize;
 use std::env;
 use std::io;
 
+const UPGRADE_INDEXER_URL: &str = "https://indexer.upgrade.thegraph.com/status";
+
 #[derive(Deserialize, Debug)]
 enum Health {
     healthy,
@@ -100,16 +102,8 @@ fn main() {
 }
 
 fn get_status_url() -> String {
-    let status_url = match env::var("SUBGRAPH_STATUS_URL") {
-        Ok(url) => url,
-        Err(_) => {
-            println!(
-                "{}",
-                "Please set SUBGRAPH_STATUS_URL environment variable to continue".red()
-            );
-            std::process::exit(1);
-        }
-    };
+    let status_url =
+        env::var("SUBGRAPH_STATUS_URL").unwrap_or_else(|_| UPGRADE_INDEXER_URL.to_string());
     return status_url;
 }
 
