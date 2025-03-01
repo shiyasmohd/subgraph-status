@@ -25,6 +25,26 @@ Example
 subgraph-status QmUfcf55AoqVs3zuyfu9TwYh8G4LxRnY5DpxjVCea3RSWe
 ```
 
+## How to fetch details from a specific indexer ❓
+
+1. Visit the [Graph Network Arbitrum Subgraph](https://thegraph.com/explorer/subgraphs/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp?view=Query&chain=arbitrum-one).
+
+2. Execute the following query with the desired indexer address:
+    ```graphql
+    {
+      indexer(id: "INDEXER_ADDRESS") {
+        url
+      }
+    }
+    ```
+
+3. Set the resulting URL as an environment variable:
+    ```sh
+    export SUBGRAPH_STATUS_URL="resulting_url"
+    ```
+
+4. You're all set! The package will now fetch the status from the specified indexer.
+
 ## How to run locally ❓
 1. Clone repository & change directory
 ```
