@@ -2,6 +2,13 @@
 
 ## 📊 Subgraph Status
 🖥️  &nbsp;CLI Application to Check Your Subgraph's Status 
+<br/>
+<br/>
+[![Crates.io](https://img.shields.io/crates/v/subgraph-status?style=flat-square)](https://crates.io/crates/subgraph-status)
+[![Crates.io](https://img.shields.io/crates/d/subgraph-status?style=flat-square)](https://crates.io/crates/subgraph-status)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE-MIT)
+[![Contributors](https://img.shields.io/github/contributors/shiyasmohd/subgraph-status?style=flat-square)](https://github.com/shiyasmohd/subgraph-status/graphs/contributors)
+
 </div>
 
 <video controls autoplay loop src='https://github.com/user-attachments/assets/eaec9da2-3ace-46a3-b076-e96a1aeb9330' width="60%"></video>
