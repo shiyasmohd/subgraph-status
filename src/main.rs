@@ -100,6 +100,22 @@ fn main() {
         println!("{}", "Please provide Deployment ID of subgraph".red());
     }
 }
+
+fn get_graft_values(yaml_str: &str) -> Option<(String, u64)> {
+    let base_re = Regex::new(r"graft:\s*\n\s*base:\s*(\S+)").ok()?;
+    let block_re = Regex::new(r"block:\s*(\d+)").ok()?;
+
+    let base = base_re.captures(yaml_str)?.get(1)?.as_str().to_string();
+    let block = block_re
+        .captures(yaml_str)?
+        .get(1)?
+        .as_str()
+        .parse::<u64>()
+        .ok()?;
+
+    Some((base, block))
+}
+
 fn get_status_url() -> String {
     let status_url =
         env::var("SUBGRAPH_STATUS_URL").unwrap_or_else(|_| UPGRADE_INDEXER_URL.to_string());
@@ -180,7 +196,7 @@ async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, req
 }
 
 #[tokio::main]
-async fn get_start_block(deployment_id: &String) -> Result<String, reqwest::Error> {
+async fn get_manifest_as_string(deployment_id: &String) -> Result<String, reqwest::Error> {
     let manifest_url = format!(
         "https://api.thegraph.com/ipfs/api/v0/cat?arg={}",
         deployment_id
@@ -188,19 +204,21 @@ async fn get_start_block(deployment_id: &String) -> Result<String, reqwest::Erro
     let client = reqwest::Client::new();
     let manifest_response = client.get(manifest_url).send().await?;
     let manifest = manifest_response.text().await?;
+    Ok(manifest)
+}
 
+fn get_start_block(manifest: &String) -> String {
     let re = Regex::new(r"startBlock:\s*(\d+)").unwrap();
     let mut start_blocks: Vec<u64> = re
-        .captures_iter(&manifest)
+        .captures_iter(manifest)
         .filter_map(|cap| cap[1].parse::<u64>().ok())
         .collect();
 
-    let start_block = start_blocks
+    start_blocks
         .iter()
         .min()
         .map(|min| min.to_string())
-        .unwrap_or_else(|| String::from("0"));
-    Ok(start_block)
+        .unwrap_or_else(|| String::from("0"))
 }
 
 fn display_status(subgraph_data: &SubgraphData) {
@@ -209,10 +227,13 @@ fn display_status(subgraph_data: &SubgraphData) {
         return;
     }
 
-    let start_block: i64 = get_start_block(&subgraph_data.indexingStatuses[0].subgraph)
-        .unwrap()
+    let manifest = get_manifest_as_string(&subgraph_data.indexingStatuses[0].subgraph).unwrap();
+
+    let start_block: i64 = get_start_block(&manifest)
         .parse()
-        .expect("Not a valid number");
+        .expect("start_block is Not a valid number");
+
+    let graft_values = get_graft_values(&manifest);
 
     let mut table = Table::new();
 
@@ -379,6 +400,18 @@ fn display_status(subgraph_data: &SubgraphData) {
         ),
     ]));
 
+    if graft_values.is_some() {
+        table.add_row(Row::new(vec![
+            Cell::new("Graft Base"),
+            Cell::new(&graft_values.as_ref().unwrap().0),
+        ]));
+
+        table.add_row(Row::new(vec![
+            Cell::new("Graft Block"),
+            Cell::new(&graft_values.as_ref().unwrap().1.to_string()),
+        ]));
+    }
+
     table.add_row(Row::new(vec![Cell::new_align(
         "Subgraph Features",
         Alignment::CENTER,
@@ -426,14 +459,22 @@ fn display_status(subgraph_data: &SubgraphData) {
         ]));
     }
 
-    let mut features_cell = String::new();
-    if subgraph_data.subgraphFeatures.features.len() == 0 {
-        features_cell = String::from("N/A");
-    } else {
-        for feature in &subgraph_data.subgraphFeatures.features {
-            features_cell.push_str(&(feature.to_string() + "\n"));
-        }
+    let mut features = subgraph_data.subgraphFeatures.features.clone();
+
+    if graft_values.is_some() && !features.contains(&"grafting".to_string()) {
+        features.push("grafting".to_string());
     }
+
+    if graft_values.is_none() && features.contains(&"grafting".to_string()) {
+        features.retain(|x| x != "grafting");
+    }
+
+    let features_cell = if features.is_empty() {
+        "N/A".to_string()
+    } else {
+        features.join("\n")
+    };
+
     table.add_row(Row::new(vec![
         Cell::new("Features Used"),
         Cell::new(&features_cell),
