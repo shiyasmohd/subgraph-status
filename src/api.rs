@@ -147,3 +147,15 @@ pub async fn get_manifest_as_string(deployment_id: &String) -> Result<String, re
     let manifest = manifest_response.text().await?;
     Ok(manifest)
 }
+
+#[tokio::main]
+pub async fn get_subgraph_id(deployment_id: &String) -> Result<String, reqwest::Error> {
+    let manifest_url = format!(
+        "https://subgraph-status-server.vercel.app/get-subgraph-id?deploymentId={}",
+        deployment_id
+    );
+    let client = reqwest::Client::new();
+    let response = client.get(manifest_url).send().await?;
+    let subgraph_id = response.text().await?;
+    Ok(subgraph_id)
+}
