@@ -1,4 +1,5 @@
 #![allow(warnings)]
+use clap::Parser;
 use colored::Colorize;
 use core::fmt;
 use prettytable::color::*;
@@ -11,6 +12,13 @@ use std::env;
 use std::io;
 
 const UPGRADE_INDEXER_URL: &str = "https://indexer.upgrade.thegraph.com/status";
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Deployment ID of the subgraph (starts with Qm)
+    deployment: String,
+}
 
 #[derive(Deserialize, Debug)]
 enum Health {
@@ -83,21 +91,18 @@ impl fmt::Display for Health {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 {
-        let deployment_id = &args[1];
-        if (deployment_id.starts_with("Qm") && deployment_id.len() == 46) {
-            match get_subgraph_status(deployment_id) {
-                Ok(res) => display_status(&res),
-                Err(err) => {
-                    println!("Failed to fetch status: {}", err);
-                }
+    let args = Args::parse();
+
+    let deployment_id = &args.deployment;
+    if (deployment_id.starts_with("Qm") && deployment_id.len() == 46) {
+        match get_subgraph_status(deployment_id) {
+            Ok(res) => display_status(&res),
+            Err(err) => {
+                println!("Failed to fetch status: {}", err);
             }
-        } else {
-            println!("{}", "Please enter correct Deployment ID".red());
         }
     } else {
-        println!("{}", "Please provide Deployment ID of subgraph".red());
+        println!("{} is not a valid deployment ID.", deployment_id.yellow());
     }
 }
 
