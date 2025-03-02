@@ -18,6 +18,10 @@ const UPGRADE_INDEXER_URL: &str = "https://indexer.upgrade.thegraph.com/status";
 struct Args {
     /// Deployment ID of the subgraph (starts with Qm)
     deployment: String,
+
+    /// Fetch status from local graph-node
+    #[clap(long, short)]
+    local: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -95,7 +99,8 @@ fn main() {
 
     let deployment_id = &args.deployment;
     if (deployment_id.starts_with("Qm") && deployment_id.len() == 46) {
-        match get_subgraph_status(deployment_id) {
+        let url = get_status_url(&args.local);
+        match get_subgraph_status(url, deployment_id) {
             Ok(res) => display_status(&res),
             Err(err) => {
                 println!("Failed to fetch status: {}", err);
@@ -121,7 +126,11 @@ fn get_graft_values(yaml_str: &str) -> Option<(String, u64)> {
     Some((base, block))
 }
 
-fn get_status_url() -> String {
+fn get_status_url(local: &bool) -> String {
+    if *local {
+        return "http://localhost:8030/graphql".to_string();
+    }
+
     let status_url =
         env::var("SUBGRAPH_STATUS_URL").unwrap_or_else(|_| UPGRADE_INDEXER_URL.to_string());
 
@@ -137,9 +146,10 @@ fn get_status_url() -> String {
 }
 
 #[tokio::main]
-async fn get_subgraph_status(deployment_id: &String) -> Result<SubgraphData, reqwest::Error> {
-    let url = get_status_url();
-
+async fn get_subgraph_status(
+    url: String,
+    deployment_id: &String,
+) -> Result<SubgraphData, reqwest::Error> {
     let client = reqwest::Client::new();
 
     let query = format!(
