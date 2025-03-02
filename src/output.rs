@@ -1,5 +1,5 @@
 use crate::{
-    api::{get_manifest_as_string, Health, SubgraphData},
+    api::{get_manifest_as_string, get_subgraph_id, Health, SubgraphData},
     helpers::{capitalize_first_letter, get_graft_values, get_start_block, get_sync_percentage},
 };
 use colored::Colorize;
@@ -14,6 +14,8 @@ pub fn display_status(subgraph_data: &SubgraphData) {
     }
 
     let manifest = get_manifest_as_string(&subgraph_data.indexingStatuses[0].subgraph).unwrap();
+
+    let subgraph_id = get_subgraph_id(&subgraph_data.indexingStatuses[0].subgraph).unwrap();
 
     let start_block: i64 = get_start_block(&manifest)
         .parse()
@@ -33,6 +35,11 @@ pub fn display_status(subgraph_data: &SubgraphData) {
     table.add_row(Row::new(vec![
         Cell::new("Deployment ID"),
         Cell::new(&subgraph_data.indexingStatuses[0].subgraph),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new("Subgraph ID"),
+        Cell::new(&subgraph_id),
     ]));
 
     table.add_row(Row::new(vec![
