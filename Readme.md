@@ -32,6 +32,11 @@ Example
 subgraph-status QmUfcf55AoqVs3zuyfu9TwYh8G4LxRnY5DpxjVCea3RSWe
 ```
 
+To fetch status from local graph-node
+```
+subgraph-status <DEPLOYMENT_ID> --local
+```
+
 ## How to fetch details from a specific indexer ❓
 
 1. Visit the [Graph Network Arbitrum Subgraph](https://thegraph.com/explorer/subgraphs/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp?view=Query&chain=arbitrum-one).
