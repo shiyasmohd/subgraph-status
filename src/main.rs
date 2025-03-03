@@ -1,7 +1,7 @@
 use api::get_subgraph_status;
 use clap::Parser;
 use colored::Colorize;
-use helpers::get_status_url;
+use helpers::{check_for_updates, get_status_url};
 use output::display_status;
 
 mod api;
@@ -20,6 +20,13 @@ struct Args {
 }
 
 fn main() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        if let Err(e) = check_for_updates().await {
+            println!("Failed to check for updates: {}", e);
+        }
+    });
+
     let args = Args::parse();
 
     let deployment_id = &args.deployment;

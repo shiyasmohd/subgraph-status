@@ -159,3 +159,11 @@ pub async fn get_subgraph_id(deployment_id: &String) -> Result<String, reqwest::
     let subgraph_id = response.text().await?;
     Ok(subgraph_id)
 }
+
+pub async fn get_latest_crate_version() -> Result<String, reqwest::Error> {
+    let url = String::from("https://subgraph-status-server.vercel.app/get-crate-latest-verision");
+    let client = reqwest::Client::new();
+    let response = client.get(url).send().await?;
+    let subgraph_id = response.text().await?;
+    Ok(subgraph_id)
+}
