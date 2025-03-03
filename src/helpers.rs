@@ -1,5 +1,8 @@
+use colored::Colorize;
 use regex::Regex;
 use std::env;
+
+use crate::api::get_latest_crate_version;
 
 const UPGRADE_INDEXER_URL: &str = "https://indexer.upgrade.thegraph.com/status";
 
@@ -66,4 +69,23 @@ pub fn capitalize_first_letter(word: &String) -> String {
         None => String::new(),
         Some(first_char) => first_char.to_uppercase().collect::<String>() + chars.as_str(),
     }
+}
+
+pub async fn check_for_updates() -> Result<(), reqwest::Error> {
+    let latest_version = get_latest_crate_version().await?;
+    // get current version
+    let current_version = env!("CARGO_PKG_VERSION");
+
+    if current_version != latest_version {
+        println!(
+            "🚨 Warning: subgraph-status update available from {} to {}",
+            current_version.yellow(),
+            latest_version.green()
+        );
+        println!(
+            "🚀 Run {} to update.",
+            "cargo install subgraph-status".green()
+        );
+    }
+    Ok(())
 }
